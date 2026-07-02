@@ -295,7 +295,7 @@ class SpectralAnalyzer(BaseAnalyzer):
                 weight=1.0,
             )
 
-        # Brick-wall detection: sharp energy drop near Nyquist
+        # Brick-wall detection: sharp energy drop near 15kHz-18kHz or Nyquist
         nyquist = sr // 2
         S = np.abs(librosa.stft(y, n_fft=8192, hop_length=2048))
         freqs = librosa.fft_frequencies(sr=sr, n_fft=8192)
@@ -309,29 +309,25 @@ class SpectralAnalyzer(BaseAnalyzer):
             next_energy = float(np.mean(avg_spectrum[next_mask])) if np.any(next_mask) else 1e-20
             if next_energy > 1e-20:
                 drop_db = 10 * np.log10(top_energy / next_energy + 1e-20)
-                is_brick_wall = drop_db < -30  # >30dB drop = brick wall
+                is_brick_wall = drop_db < -18  # >18dB drop = brick wall cutoff
 
-        # Map to probability — brick-wall detection is the primary indicator.
-        # Rolloff frequency alone is genre-dependent (jazz/acoustic concentrate
-        # energy lower than pop/rock), so non-brick-wall only flags extreme cases.
-        if is_brick_wall:
-            # Hard bandwidth cutoff is a strong AI indicator
-            if median_rolloff < 8000:
-                probability = 0.95
+        # Check for Suno/Udio characteristic 15.5kHz - 17.5kHz cutoff
+        is_suno_udio_cutoff = 14000 <= median_rolloff <= 17800 and is_brick_wall
+
+        if is_suno_udio_cutoff:
+            probability = 0.90
+            severity = "high"
+        elif is_brick_wall:
+            if median_rolloff < 14000:
+                probability = 0.85
                 severity = "high"
-            elif median_rolloff < 12000:
-                probability = 0.7
-                severity = "high"
-            elif median_rolloff < 16000:
-                probability = 0.4
+            elif median_rolloff < 18500:
+                probability = 0.70
                 severity = "medium"
             else:
                 probability = 0.0
                 severity = "none"
         else:
-            # Without brick-wall, rolloff frequency is genre-dependent
-            # (jazz/acoustic naturally concentrates energy lower than rock/pop).
-            # Only flag telephone-quality bandwidth (<2kHz at 95% energy).
             if median_rolloff < 2000:
                 probability = 0.5
                 severity = "medium"
@@ -340,6 +336,7 @@ class SpectralAnalyzer(BaseAnalyzer):
                 severity = "none"
 
         detected = probability >= 0.3
+
 
         desc = f"Spectral rolloff (95% energy): {median_rolloff:.0f} Hz"
         if is_brick_wall and detected:
