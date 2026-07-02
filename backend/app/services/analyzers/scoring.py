@@ -10,8 +10,9 @@ from .base import ArtifactResult, DomainResult
 
 # --- Scoring constants ---
 EVIDENCE_THRESHOLD = 0.10       # Below this, domain weight is linearly ramped down
-CONCORDANCE_THRESHOLD = 0.35    # Above this, domain counts as concordant evidence
-CONCORDANCE_BOOST_FACTOR = 0.25 # Multiplied with concordant signal for bonus
+CONCORDANCE_THRESHOLD = 0.55    # Above this, domain counts as concordant evidence (raised to prevent false positive boosts)
+CONCORDANCE_BOOST_FACTOR = 0.10 # Multiplied with concordant signal for bonus
+
 
 
 @dataclass

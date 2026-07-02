@@ -35,5 +35,7 @@ class TestArtifactWeights:
 
     def test_all_tier_one_artifacts(self):
         tier_ones = {k for k, v in weights.ARTIFACT_WEIGHTS.items() if int(v.tier) == 1}
+        tier_fours = {k for k, v in weights.ARTIFACT_WEIGHTS.items() if int(v.tier) == 4}
         assert "audioseal_watermark" in tier_ones
-        assert "loudness_range" in tier_ones
+        assert "loudness_range" in tier_fours
+

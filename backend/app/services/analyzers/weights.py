@@ -90,11 +90,13 @@ ARTIFACT_WEIGHTS: dict[str, ArtifactWeightConfig] = {
         tier=ArtifactTier.DEFINITIVE,
         notes="AI watermark is near-definitive proof of AI generation.",
     ),
+    # ---- Tier 4: Weak / Contextual ----
     "loudness_range": ArtifactWeightConfig(
-        weight=4.5,
-        tier=ArtifactTier.DEFINITIVE,
-        notes="Best empirical discriminator: 8/12 AI tracks < 5 LU vs 8/10 humans ≥ 5 LU.",
+        weight=0.5,
+        tier=ArtifactTier.WEAK,
+        notes="Demoted: Loudness war mastering on human tracks commonly produces LRA < 5 LU.",
     ),
+
     # ---- Tier 2: Strong ----
     "reverb_tail_analysis": ArtifactWeightConfig(
         weight=2.0,

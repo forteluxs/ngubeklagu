@@ -91,33 +91,24 @@ class ProductionAnalyzer(BaseAnalyzer):
                 if np.mean(upper_region) > np.mean(peak_region) * 3:
                     has_tanh_saturation = True
 
-        # Map to probability
-        if crest_factor_db < 4.0:
-            probability = 0.85
-            severity = "high"
-        elif crest_factor_db < 6.0:
+        # Map to probability (re-calibrated: human commercial masters often range 4.5-8.0 dB)
+        if crest_factor_db < 3.0:
             probability = 0.6
             severity = "medium"
-        elif crest_factor_db < 8.0:
-            probability = 0.3
+        elif crest_factor_db < 4.5 and has_tanh_saturation:
+            probability = 0.35
             severity = "low"
         else:
             probability = 0.0
             severity = "none"
 
-        # Tanh saturation bonus
-        if has_tanh_saturation and probability > 0.1:
-            probability = min(1.0, probability + 0.2)
-            if severity == "none":
-                severity = "low"
-
-        detected = probability >= 0.3
+        detected = probability >= 0.35
 
         desc = f"Crest factor: {crest_factor_db:.1f} dB"
         if has_tanh_saturation:
-            desc += " with tanh-shaped soft saturation"
+            desc += " with soft saturation"
         if detected:
-            desc += ". Low dynamic range with soft waveform typical of AI generation."
+            desc += ". Unusually compressed waveform typical of raw AI generation."
         else:
             desc += ". Dynamic range consistent with professional production."
 
@@ -134,7 +125,7 @@ class ProductionAnalyzer(BaseAnalyzer):
     def _check_loudness_range(self, y: np.ndarray, sr: int) -> ArtifactResult:
         """Check EBU R128 loudness range for flat dynamics.
 
-        AI tracks often have extremely low loudness range (<3 LU),
+        AI tracks often have extremely low loudness range (<2 LU),
         meaning verse and chorus are equally loud with no dynamic arc.
         """
         # pyloudnorm requires float64
@@ -182,22 +173,22 @@ class ProductionAnalyzer(BaseAnalyzer):
         # LRA approximation: difference between 95th and 10th percentile
         lra = float(np.percentile(stl, 95) - np.percentile(stl, 10))
 
-        # Data-driven thresholds from 22-track analysis:
-        # 8/12 AI tracks have LRA < 5.0 LU; 8/10 human tracks >= 5.0 LU.
-        if lra < 3.5:
-            probability = 0.75
+        # Re-calibrated thresholds: human commercial pop/rock tracks often have LRA 2.5 - 5.0 LU
+        if lra < 1.5:
+            probability = 0.70
             severity = "high"
-        elif lra < 5.0:
-            probability = 0.50
+        elif lra < 2.5:
+            probability = 0.35
             severity = "medium"
-        elif lra < 7.0:
-            probability = 0.15
+        elif lra < 3.5:
+            probability = 0.10
             severity = "low"
         else:
             probability = 0.0
             severity = "none"
 
-        detected = lra < 5.0
+        detected = lra < 2.5
+
 
         return ArtifactResult(
             name="loudness_range",
