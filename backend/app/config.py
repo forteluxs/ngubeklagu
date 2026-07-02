@@ -4,7 +4,7 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings
 
-APP_VERSION = "0.1.0"
+APP_VERSION = "0.2.0"
 
 
 class Settings(BaseSettings):
@@ -20,11 +20,16 @@ class Settings(BaseSettings):
 
     # Analysis defaults
     default_analysis_depth: str = "standard"
-    analysis_timeout_seconds: int = 120
+    analysis_timeout_seconds: int = 300
 
     # Optional features
     enable_vocal_analysis: bool = True
     enable_watermark_detection: bool = True
+
+    # Rate limiting
+    rate_limit_enabled: bool = True
+    rate_limit_max_requests: int = 10
+    rate_limit_window_seconds: int = 60
 
     class Config:
         env_prefix = "AI_DETECTOR_"

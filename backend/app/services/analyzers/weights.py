@@ -55,7 +55,7 @@ class DomainWeightConfig:
 
 DOMAIN_WEIGHTS: dict[str, DomainWeightConfig] = {
     "spectral": DomainWeightConfig(
-        base_weight=0.4, display_name="Spectral Analysis"
+        base_weight=0.37, display_name="Spectral Analysis"
     ),
     "temporal": DomainWeightConfig(
         base_weight=0.1, display_name="Temporal Analysis"
@@ -70,11 +70,11 @@ DOMAIN_WEIGHTS: dict[str, DomainWeightConfig] = {
         base_weight=0.05, display_name="Production Analysis"
     ),
     "vocal": DomainWeightConfig(
-        base_weight=0.2, display_name="Vocal Analysis"
+        base_weight=0.18, display_name="Vocal Analysis"
     ),
-    #"watermark": DomainWeightConfig(
-    #    base_weight=0.2, display_name="Watermark Detection"
-    #),
+    "watermark": DomainWeightConfig(
+        base_weight=0.05, display_name="Watermark Detection"
+    ),
 }
 
 

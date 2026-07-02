@@ -1,14 +1,19 @@
 """Audio analysis API endpoints."""
 
+import asyncio
+import logging
 import tempfile
+import time
+from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
 import aiofiles
-from fastapi import APIRouter, HTTPException, File, UploadFile, Query, BackgroundTasks
+from fastapi import APIRouter, HTTPException, File, UploadFile, Query, BackgroundTasks, Request
 
-from ..config import APP_VERSION
+from ..config import APP_VERSION, settings
 from ..models.schemas import (
     AnalysisDepth,
     AnalysisResponse,
@@ -17,13 +22,36 @@ from ..models.schemas import (
 )
 from ..services.audio_analyzer import audio_analyzer
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api", tags=["analysis"])
 
 SUPPORTED_FORMATS = {".wav", ".mp3", ".flac", ".ogg", ".m4a", ".aac", ".wma"}
 
+_executor = ThreadPoolExecutor(max_workers=2)
+
+
+_rate_limit_buckets: dict[str, list[float]] = defaultdict(list)
+
+
+def _check_rate_limit(client_ip: str) -> None:
+    if not settings.rate_limit_enabled:
+        return
+    now = time.time()
+    window = settings.rate_limit_window_seconds
+    bucket = _rate_limit_buckets[client_ip]
+    bucket[:] = [t for t in bucket if now - t < window]
+    if len(bucket) >= settings.rate_limit_max_requests:
+        retry_after = int(window - (now - bucket[0]))
+        raise HTTPException(
+            status_code=429,
+            detail=f"Rate limit exceeded. Try again in {retry_after}s.",
+            headers={"Retry-After": str(retry_after)},
+        )
+    bucket.append(now)
+
 
 def _cleanup_temp_file(file_path: Path):
-    """Background task to clean up temporary file."""
     try:
         if file_path.exists():
             file_path.unlink()
@@ -31,8 +59,13 @@ def _cleanup_temp_file(file_path: Path):
         pass
 
 
+def _run_analysis(temp_path: Path, depth_value: str) -> dict:
+    return audio_analyzer.analyze_file(audio_path=temp_path, depth=depth_value)
+
+
 @router.post("/analyze", response_model=AnalysisResponse)
 async def analyze_audio(
+    request: Request,
     file: UploadFile = File(...),
     depth: AnalysisDepth = Query(default=AnalysisDepth.STANDARD),
     background_tasks: BackgroundTasks = None,
@@ -46,6 +79,9 @@ async def analyze_audio(
 
     Supports: WAV, MP3, FLAC, OGG, M4A, AAC, WMA
     """
+    client_ip = request.client.host if request.client else "unknown"
+    _check_rate_limit(client_ip)
+
     if not file.filename:
         raise HTTPException(status_code=400, detail="Filename required")
 
@@ -56,6 +92,14 @@ async def analyze_audio(
             detail=f"Unsupported format. Supported: {', '.join(sorted(SUPPORTED_FORMATS))}",
         )
 
+    max_bytes = settings.max_file_size_mb * 1024 * 1024
+    content_length = request.headers.get("content-length")
+    if content_length and int(content_length) > max_bytes:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File exceeds maximum size of {settings.max_file_size_mb}MB",
+        )
+
     temp_dir = Path(tempfile.gettempdir()) / "ai-audio-detector"
     temp_dir.mkdir(exist_ok=True)
 
@@ -63,14 +107,27 @@ async def analyze_audio(
     temp_path = temp_dir / temp_filename
 
     try:
+        content = await file.read()
+        if len(content) > max_bytes:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File exceeds maximum size of {settings.max_file_size_mb}MB",
+            )
+
         async with aiofiles.open(temp_path, "wb") as f:
-            content = await file.read()
             await f.write(content)
 
-        result = audio_analyzer.analyze_file(
-            audio_path=temp_path,
-            depth=depth.value,
-        )
+        loop = asyncio.get_running_loop()
+        try:
+            result = await asyncio.wait_for(
+                loop.run_in_executor(_executor, _run_analysis, temp_path, depth.value),
+                timeout=settings.analysis_timeout_seconds,
+            )
+        except asyncio.TimeoutError:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Analysis timed out after {settings.analysis_timeout_seconds}s",
+            )
 
         return AnalysisResponse(
             scan_id=str(uuid4()),
@@ -107,9 +164,12 @@ async def analyze_audio(
             stereo_correlation=result.get("stereo_correlation"),
         )
 
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        logger.exception("Analysis failed")
         raise HTTPException(status_code=500, detail=f"Analysis failed: {e}")
     finally:
         if background_tasks:
@@ -121,4 +181,4 @@ async def analyze_audio(
 @router.get("/health")
 async def health_check():
     """Health check endpoint."""
-    return {"status": "ok", "service": "ai-audio-detector"}
+    return {"status": "ok", "service": "ai-audio-detector", "version": APP_VERSION}

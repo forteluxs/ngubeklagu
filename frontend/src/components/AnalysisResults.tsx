@@ -4,138 +4,128 @@ import ScoreGauge from './ScoreGauge'
 import DomainCard from './DomainCard'
 import AudioInfo from './AudioInfo'
 
-interface AnalysisResultsProps {
+interface Props {
   result: AnalysisResult
   onReset: () => void
 }
 
-export default function AnalysisResults({ result, onReset }: AnalysisResultsProps) {
+export default function AnalysisResults({ result, onReset }: Props) {
   const activeDomains = result.domain_results.filter(d => d.active)
   const inactiveDomains = result.domain_results.filter(d => !d.active)
-
-  // Sort active domains by score descending so most suspicious appear first
   const sortedActive = [...activeDomains].sort((a, b) => b.score - a.score)
 
-  const handleExportJSON = () => {
-    const exportData = {
-      ...result,
-      export_metadata: {
-        exported_at: new Date().toISOString(),
-        export_format_version: '1.0',
-      },
-    }
-
-    const jsonString = JSON.stringify(exportData, null, 2)
-    const blob = new Blob([jsonString], { type: 'application/json' })
+  const handleExport = () => {
+    const data = { ...result, export_metadata: { exported_at: new Date().toISOString(), version: '1.0' } }
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
-
-    // Generate filename: originalname_analysis_timestamp.json
-    const baseName = result.filename.replace(/\.[^/.]+$/, '')
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-    const exportFilename = `${baseName}_analysis_${timestamp}.json`
-
-    const link = document.createElement('a')
-    link.href = url
-    link.download = exportFilename
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+    const base = result.filename.replace(/\.[^/.]+$/, '')
+    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+    const a = document.createElement('a')
+    a.href = url; a.download = `${base}_analysis_${ts}.json`
+    document.body.appendChild(a); a.click(); document.body.removeChild(a)
     URL.revokeObjectURL(url)
   }
 
   return (
     <div className="space-y-6">
-      {/* Header with filename, export, and reset */}
-      <div className="flex items-center justify-between">
+      {/* Top bar */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 rounded-lg bg-purple-500/15 flex items-center justify-center flex-shrink-0">
-            <FileAudio className="w-5 h-5 text-purple-400" />
+          <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center flex-shrink-0">
+            <FileAudio className="w-5 h-5 text-indigo-400" />
           </div>
           <div className="min-w-0">
-            <h2 className="text-lg font-semibold text-gray-100 truncate">{result.filename}</h2>
-            <p className="text-xs text-gray-500">
-              Analyzed at <span className="text-gray-400 font-medium">{result.depth_used}</span> depth
-              {result.scan_id && (
-                <span className="ml-2 text-gray-600" title={`Scan ID: ${result.scan_id}`}>
-                  {result.scan_id.slice(0, 8)}
-                </span>
-              )}
+            <h2 className="text-base font-semibold text-gray-100 truncate">{result.filename}</h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              <span className="text-gray-400 font-medium">{result.depth_used}</span> depth
+              <span className="mx-2 text-gray-700">&middot;</span>
+              <span className="font-mono text-gray-600">{result.scan_id.slice(0, 8)}</span>
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={handleExportJSON}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-800/50 border border-gray-700/40 text-gray-400 hover:text-gray-200 hover:bg-gray-800/80 transition text-sm"
-            title="Export scan results as JSON"
-          >
-            <Download className="w-4 h-4" />
-            Export JSON
+          <button onClick={handleExport}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl glass border-white/[0.06] text-gray-400 hover:text-gray-200 hover:bg-white/[0.04] transition text-sm font-medium">
+            <Download className="w-4 h-4" /> Export
           </button>
-          <button
-            onClick={onReset}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-800/50 border border-gray-700/40 text-gray-400 hover:text-gray-200 hover:bg-gray-800/80 transition text-sm"
-          >
-            <RotateCcw className="w-4 h-4" />
-            Analyze Another
+          <button onClick={onReset}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl glass border-white/[0.06] text-gray-400 hover:text-gray-200 hover:bg-white/[0.04] transition text-sm font-medium">
+            <RotateCcw className="w-4 h-4" /> New Scan
           </button>
         </div>
       </div>
 
-      {/* Audio properties */}
+      {/* Audio info */}
       <AudioInfo result={result} />
 
-      {/* Score gauge + domain cards layout */}
+      {/* Main results grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Score gauge - left column */}
-        <div className="lg:col-span-1">
+        {/* Left column: score + summary */}
+        <div className="lg:col-span-1 space-y-4">
           <ScoreGauge
             score={result.overall_score}
             confidence={result.confidence}
             likelihood={result.overall_ai_likelihood}
           />
 
-          {/* Quick stats under gauge */}
-          <div className="mt-4 bg-gray-800/30 rounded-xl border border-gray-700/30 p-4 space-y-3">
-            <h4 className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Detection Summary</h4>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-400">Domains analyzed</span>
-              <span className="text-gray-200 font-medium">{activeDomains.length} / {result.domain_results.length}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-400">Artifacts detected</span>
-              <span className="text-gray-200 font-medium">
-                {result.ai_artifacts.filter(a => a.detected).length} / {result.ai_artifacts.length}
-              </span>
-            </div>
-            {result.high_freq_cutoff_hz && (
+          {/* Summary card */}
+          <div className="glass rounded-2xl p-5 space-y-3.5 border-white/[0.06]">
+            <h4 className="text-[11px] text-gray-500 uppercase tracking-[0.15em] font-semibold">Scan Summary</h4>
+            <div className="space-y-2.5">
               <div className="flex justify-between text-sm">
-                <span className="text-gray-400">HF cutoff</span>
-                <span className="text-gray-200 font-medium">
-                  {(result.high_freq_cutoff_hz / 1000).toFixed(1)} kHz
+                <span className="text-gray-500">Domains</span>
+                <span className="text-gray-200 font-medium tabular-nums">
+                  {activeDomains.length}<span className="text-gray-600">/{result.domain_results.length}</span>
                 </span>
               </div>
-            )}
-            {result.stereo_correlation !== null && (
               <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Stereo correlation</span>
-                <span className="text-gray-200 font-medium">{result.stereo_correlation?.toFixed(3)}</span>
+                <span className="text-gray-500">Artifacts</span>
+                <span className="text-gray-200 font-medium tabular-nums">
+                  {result.ai_artifacts.filter(a => a.detected).length}
+                  <span className="text-gray-600">/{result.ai_artifacts.length}</span>
+                </span>
               </div>
-            )}
+              {result.high_freq_cutoff_hz && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">HF Cutoff</span>
+                  <span className="text-gray-200 font-medium tabular-nums">
+                    {(result.high_freq_cutoff_hz / 1000).toFixed(1)} kHz
+                  </span>
+                </div>
+              )}
+              {result.stereo_correlation !== null && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Stereo Corr</span>
+                  <span className="text-gray-200 font-medium tabular-nums">
+                    {result.stereo_correlation?.toFixed(3)}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Confidence</span>
+                <span className="text-gray-200 font-medium tabular-nums">
+                  {(result.confidence_value * 100).toFixed(0)}%
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Domain cards - right two columns */}
+        {/* Right: domain cards */}
         <div className="lg:col-span-2 space-y-3">
-          <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Domain Analysis</h3>
-          {sortedActive.map((domain) => (
-            <DomainCard key={domain.domain} domain={domain} />
+          <h3 className="text-[11px] text-gray-500 uppercase tracking-[0.15em] font-semibold ml-1">
+            Domain Analysis
+          </h3>
+          {sortedActive.map(d => (
+            <DomainCard key={d.domain} domain={d} />
           ))}
           {inactiveDomains.length > 0 && (
             <>
-              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mt-4">Inactive Domains</h3>
-              {inactiveDomains.map((domain) => (
-                <DomainCard key={domain.domain} domain={domain} />
+              <h3 className="text-[11px] text-gray-600 uppercase tracking-[0.15em] font-semibold ml-1 mt-6">
+                Inactive
+              </h3>
+              {inactiveDomains.map(d => (
+                <DomainCard key={d.domain} domain={d} />
               ))}
             </>
           )}

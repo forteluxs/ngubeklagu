@@ -28,6 +28,7 @@ vocal = ["praat-parselmouth>=0.4.5"]
 watermark = ["audioseal>=0.1.5"]
 torch-cpu = ["torch>=2.4.0", "torchaudio>=2.4.0"]
 all = ["ai-audio-detector[vocal,watermark,torch-cpu]"]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "httpx>=0.27"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["backend/app"]

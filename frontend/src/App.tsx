@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AudioLines, Loader2, AlertCircle } from 'lucide-react'
+import { AudioLines, Loader2, AlertCircle, Activity } from 'lucide-react'
 import FileUploader from './components/FileUploader'
 import DepthSelector from './components/DepthSelector'
 import AnalysisResults from './components/AnalysisResults'
@@ -7,13 +7,33 @@ import { analyzeAudio, type AnalysisDepth, type AnalysisResult } from './service
 
 type AppState = 'idle' | 'analyzing' | 'results' | 'error'
 
+const DEPTH_MESSAGES: Record<AnalysisDepth, { title: string; subtitle: string }> = {
+  quick: {
+    title: 'Running Quick Analysis',
+    subtitle: 'Spectral, spatial, and production checks in progress...',
+  },
+  standard: {
+    title: 'Running Standard Analysis',
+    subtitle: 'Full analysis including temporal integrity checks...',
+  },
+  deep: {
+    title: 'Running Deep Forensic Analysis',
+    subtitle: 'Structural, vocal, and watermark detection active...',
+  },
+}
+
+const DEPTH_TIMES: Record<AnalysisDepth, string> = {
+  quick: '~5s',
+  standard: '~15s',
+  deep: '~45s',
+}
+
 export default function App() {
   const [state, setState] = useState<AppState>('idle')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [depth, setDepth] = useState<AnalysisDepth>('standard')
   const [result, setResult] = useState<AnalysisResult | null>(null)
   const [error, setError] = useState<string>('')
-  const [progress, setProgress] = useState<string>('')
 
   const handleFileSelected = (file: File) => {
     setSelectedFile(file)
@@ -27,44 +47,29 @@ export default function App() {
 
   const handleAnalyze = async () => {
     if (!selectedFile) return
-
     setState('analyzing')
     setError('')
     setResult(null)
 
-    // Set progress message based on depth
-    const depthMessages: Record<AnalysisDepth, string> = {
-      quick: 'Running spectral, spatial, and production checks...',
-      standard: 'Running full analysis including temporal checks...',
-      deep: 'Running deep analysis including structural, vocal, and watermark detection...',
-    }
-    setProgress(depthMessages[depth])
-
     try {
-      const analysisResult = await analyzeAudio(selectedFile, depth)
-      setResult(analysisResult)
+      const res = await analyzeAudio(selectedFile, depth)
+      setResult(res)
       setState('results')
     } catch (err: unknown) {
       let message = 'An unexpected error occurred'
-
       if (err instanceof Error) {
         if (err.message.includes('Network Error')) {
-          message = 'Cannot connect to the backend server. Make sure it is running on port 8000.'
+          message = 'Cannot connect to backend. Ensure server is running on port 8000.'
         } else if (err.message.includes('timeout')) {
-          message = 'Analysis timed out. Try a shorter audio file or a quicker analysis depth.'
+          message = 'Analysis timed out. Try a shorter file or quicker depth.'
         } else {
           message = err.message
         }
       }
-
-      // Check for Axios error response
       if (typeof err === 'object' && err !== null && 'response' in err) {
-        const axiosErr = err as { response?: { data?: { detail?: string } } }
-        if (axiosErr.response?.data?.detail) {
-          message = axiosErr.response.data.detail
-        }
+        const axiosErr = err as { response?: { data?: { detail?: string }; status?: number } }
+        if (axiosErr.response?.data?.detail) message = axiosErr.response.data.detail
       }
-
       setError(message)
       setState('error')
     }
@@ -75,147 +80,175 @@ export default function App() {
     setSelectedFile(null)
     setResult(null)
     setError('')
-    setProgress('')
   }
 
   return (
-    <div className="min-h-screen bg-grid-pattern">
+    <div className="min-h-screen bg-mesh bg-grid">
       {/* Header */}
-      <header className="border-b border-gray-800/60 bg-gray-950/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-purple-500/20 flex items-center justify-center">
-            <AudioLines className="w-5 h-5 text-purple-400" />
+      <header className="sticky top-0 z-50 border-b border-white/[0.04] glass">
+        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
+              <AudioLines className="w-4 h-4 text-indigo-400" />
+            </div>
+            <div>
+              <h1 className="text-sm font-semibold text-gray-100 tracking-tight">
+                NgubekLagu
+              </h1>
+              <span className="text-[10px] text-gray-600 font-medium">
+                AI Detection Engine
+              </span>
+            </div>
           </div>
-          <div>
-            <h1 className="text-lg font-bold text-gray-100">AI Audio Detector</h1>
-            <p className="text-[11px] text-gray-500 -mt-0.5">Signal-level AI generation analysis</p>
+          <div className="flex items-center gap-4 text-xs text-gray-600">
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/60" />
+              {state === 'analyzing' ? 'Processing...' : 'Ready'}
+            </span>
+            <span className="text-gray-800">v0.2</span>
           </div>
         </div>
       </header>
 
-      {/* Main content */}
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Results view */}
+      {/* Main */}
+      <main className="max-w-6xl mx-auto px-6 py-10">
+        {/* Results state */}
         {state === 'results' && result && (
-          <AnalysisResults result={result} onReset={handleReset} />
+          <div className="animate-fade-in-up">
+            <AnalysisResults result={result} onReset={handleReset} />
+          </div>
         )}
 
-        {/* Analyzing view */}
+        {/* Analyzing state */}
         {state === 'analyzing' && (
-          <div className="flex flex-col items-center justify-center py-24 gap-6">
+          <div className="flex flex-col items-center justify-center py-32 gap-8 animate-fade-in-up">
             <div className="relative">
-              <div className="w-20 h-20 rounded-full border-2 border-purple-500/30 flex items-center justify-center">
-                <Loader2 className="w-10 h-10 text-purple-400 animate-spin" />
+              <div className="w-24 h-24 rounded-2xl glass flex items-center justify-center">
+                <Activity className="w-10 h-10 text-indigo-400 animate-pulse-ring" />
               </div>
-              <div className="absolute inset-0 w-20 h-20 rounded-full border-2 border-purple-400/20 animate-spin-slow" />
+              <div className="absolute -inset-3 rounded-2xl border border-indigo-500/10 animate-spin-slow" />
             </div>
-            <div className="text-center">
-              <h2 className="text-xl font-semibold text-gray-200 mb-2">Analyzing Audio</h2>
-              <p className="text-sm text-gray-500 max-w-md">{progress}</p>
-              <p className="text-xs text-gray-600 mt-3">
-                {depth === 'quick' ? '~5 seconds' : depth === 'standard' ? '~15 seconds' : '~45 seconds'}
+            <div className="text-center space-y-2">
+              <h2 className="text-xl font-semibold text-gray-200">
+                {DEPTH_MESSAGES[depth].title}
+              </h2>
+              <p className="text-sm text-gray-500 max-w-md">
+                {DEPTH_MESSAGES[depth].subtitle}
               </p>
+              <div className="flex items-center justify-center gap-2 mt-4">
+                <Loader2 className="w-3.5 h-3.5 text-indigo-400 animate-spin" />
+                <span className="text-xs text-gray-600 font-mono">
+                  Estimated: {DEPTH_TIMES[depth]}
+                </span>
+              </div>
+            </div>
+            {/* Skeleton preview */}
+            <div className="w-full max-w-md space-y-3 opacity-30">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-12 rounded-xl glass animate-pulse" />
+              ))}
             </div>
           </div>
         )}
 
-        {/* Idle / Error view — upload form */}
+        {/* Idle / Error state */}
         {(state === 'idle' || state === 'error') && (
-          <div className="space-y-6">
-            {/* Intro text */}
-            <div className="text-center py-4">
-              <h2 className="text-2xl font-bold text-gray-100 mb-2">
-                Detect AI-Generated Audio
+          <div className="space-y-8 animate-fade-in-up">
+            {/* Hero */}
+            <div className="text-center py-6 space-y-3">
+              <h2 className="text-3xl font-bold text-gray-100 tracking-tight">
+                AI Audio Detection
               </h2>
-              <p className="text-sm text-gray-500 max-w-xl mx-auto">
-                Upload an audio file to analyze it for AI generation artifacts across 7 detection
-                domains: spectral, spatial, temporal, structural, production, vocal, and watermark.
+              <p className="text-sm text-gray-500 max-w-xl mx-auto leading-relaxed">
+                Forensic signal analysis across 7 independent domains to detect
+                AI-generated music with probabilistic scoring and confidence estimation.
               </p>
             </div>
 
-            {/* File uploader */}
-            <FileUploader
-              onFileSelected={handleFileSelected}
-              selectedFile={selectedFile}
-              onClear={handleClearFile}
-              disabled={false}
-            />
-
-            {/* Depth selector + Analyze button */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div>
-                <label className="block text-xs text-gray-500 uppercase tracking-wider font-semibold mb-2">
-                  Analysis Depth
-                </label>
-                <DepthSelector value={depth} onChange={setDepth} />
-              </div>
-
-              <button
-                onClick={handleAnalyze}
-                disabled={!selectedFile}
-                className={`
-                  px-6 py-3 rounded-xl font-semibold text-sm transition-all duration-200
-                  flex items-center gap-2
-                  ${selectedFile
-                    ? 'bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-600/20 hover:shadow-purple-500/30'
-                    : 'bg-gray-800 text-gray-600 cursor-not-allowed'
-                  }
-                `}
-              >
-                <AudioLines className="w-4 h-4" />
-                Analyze Audio
-              </button>
+            {/* Upload */}
+            <div className="max-w-xl mx-auto">
+              <FileUploader
+                onFileSelected={handleFileSelected}
+                selectedFile={selectedFile}
+                onClear={handleClearFile}
+              />
             </div>
 
-            {/* Error display */}
-            {state === 'error' && error && (
-              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                <div>
-                  <h3 className="text-sm font-semibold text-red-400">Analysis Failed</h3>
-                  <p className="text-sm text-red-300/70 mt-1">{error}</p>
+            {/* Depth + Analyze */}
+            {selectedFile && (
+              <div className="max-w-xl mx-auto animate-fade-in-up">
+                <div className="glass rounded-2xl p-5 space-y-4">
+                  <div>
+                    <label className="block text-[11px] text-gray-500 uppercase tracking-[0.15em] font-semibold mb-2.5">
+                      Analysis Depth
+                    </label>
+                    <DepthSelector value={depth} onChange={setDepth} />
+                  </div>
                   <button
-                    onClick={() => { setState('idle'); setError('') }}
-                    className="text-xs text-red-400 hover:text-red-300 mt-2 underline underline-offset-2"
+                    onClick={handleAnalyze}
+                    className="w-full h-12 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700
+                      text-white font-medium rounded-xl transition-all duration-200
+                      flex items-center justify-center gap-2 text-sm
+                      shadow-lg shadow-indigo-500/15 hover:shadow-indigo-500/25"
                   >
-                    Dismiss
+                    <AudioLines className="w-4 h-4" />
+                    Analyze Audio
                   </button>
                 </div>
               </div>
             )}
 
-            {/* Domain info */}
-            <div className="mt-8 pt-6 border-t border-gray-800/50">
-              <h3 className="text-xs text-gray-600 uppercase tracking-wider font-semibold mb-4 text-center">
+            {/* Error */}
+            {state === 'error' && error && (
+              <div className="max-w-xl mx-auto animate-fade-in-up">
+                <div className="bg-red-500/[0.06] border border-red-500/20 rounded-2xl p-4 flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h3 className="text-sm font-semibold text-red-300">Analysis Failed</h3>
+                    <p className="text-xs text-red-400/70 mt-1 leading-relaxed">{error}</p>
+                    <button
+                      onClick={() => { setState('idle'); setError(''); }}
+                      className="text-xs text-red-400/80 hover:text-red-300 mt-2 underline underline-offset-2"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Domain grid */}
+            <div className="max-w-3xl mx-auto pt-4">
+              <p className="text-center text-[11px] text-gray-600 uppercase tracking-[0.15em] font-semibold mb-5">
                 Detection Domains
-              </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2">
                 {[
-                  { name: 'Spectral', desc: 'Frequency artifacts', depth: 'quick' },
-                  { name: 'Spatial', desc: 'Stereo imaging', depth: 'quick' },
-                  { name: 'Production', desc: 'Dynamics & reverb', depth: 'quick' },
-                  { name: 'Temporal', desc: 'Transients & rhythm', depth: 'standard' },
-                  { name: 'Structural', desc: 'Form & entropy', depth: 'deep' },
-                  { name: 'Vocal', desc: 'Formants & breath', depth: 'deep' },
-                  { name: 'Watermark', desc: 'AudioSeal check', depth: 'deep' },
+                  { name: 'Spectral', desc: 'Frequency', depth: 'quick' },
+                  { name: 'Spatial', desc: 'Stereo', depth: 'quick' },
+                  { name: 'Production', desc: 'Dynamics', depth: 'quick' },
+                  { name: 'Temporal', desc: 'Rhythm', depth: 'standard' },
+                  { name: 'Structural', desc: 'Form', depth: 'deep' },
+                  { name: 'Vocal', desc: 'Voice', depth: 'deep' },
+                  { name: 'Watermark', desc: 'Provenance', depth: 'deep' },
                 ].map((d) => {
-                  const isActive =
+                  const active =
                     depth === 'deep' ||
                     (depth === 'standard' && d.depth !== 'deep') ||
                     (depth === 'quick' && d.depth === 'quick')
                   return (
                     <div
                       key={d.name}
-                      className={`rounded-lg px-3 py-2.5 text-center border transition-all duration-300 ${
-                        isActive
-                          ? 'bg-gray-800/50 border-gray-700/50 text-gray-300'
-                          : 'bg-gray-900/30 border-gray-800/30 text-gray-700'
+                      className={`rounded-xl px-3 py-3 text-center border transition-all duration-500 ${
+                        active
+                          ? 'glass border-white/[0.08] text-gray-300'
+                          : 'bg-white/[0.01] border-white/[0.03] text-gray-700'
                       }`}
                     >
-                      <p className={`text-xs font-semibold ${isActive ? 'text-gray-200' : 'text-gray-600'}`}>
+                      <p className={`text-xs font-semibold ${active ? 'text-gray-200' : 'text-gray-700'}`}>
                         {d.name}
                       </p>
-                      <p className="text-[10px] mt-0.5">{d.desc}</p>
+                      <p className="text-[10px] mt-1 opacity-60">{d.desc}</p>
                     </div>
                   )
                 })}
@@ -226,10 +259,10 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-gray-800/40 mt-12">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between text-xs text-gray-700">
-          <span>AI Audio Detector v0.1.0</span>
-          <span>17 checks &middot; 7 domains &middot; Signal-level analysis</span>
+      <footer className="border-t border-white/[0.03] mt-16">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between text-[11px] text-gray-700">
+          <span>NgubekLagu v0.2</span>
+          <span>17 checks · 7 domains · Signal-level forensic analysis</span>
         </div>
       </footer>
     </div>

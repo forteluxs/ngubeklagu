@@ -1,117 +1,101 @@
-import { Shield, ShieldAlert, ShieldCheck, ShieldQuestion } from 'lucide-react'
+import { ShieldAlert, ShieldCheck, AlertTriangle, HelpCircle } from 'lucide-react'
 
 interface ScoreGaugeProps {
-  score: number           // 0-100
-  confidence: string      // "low" | "medium" | "high"
-  likelihood: string      // "unlikely" | "possible" | "likely" | "unknown"
+  score: number
+  confidence: string
+  likelihood: string
 }
 
 export default function ScoreGauge({ score, confidence, likelihood }: ScoreGaugeProps) {
-  const radius = 80
-  const stroke = 10
-  const normalizedRadius = radius - stroke / 2
-  const circumference = normalizedRadius * 2 * Math.PI
-  const strokeDashoffset = circumference - (score / 100) * circumference
+  const size = 200
+  const strokeWidth = 7
+  const radius = (size - strokeWidth) / 2
+  const circumference = 2 * Math.PI * radius
+  const offset = circumference - (score / 100) * circumference
 
-  // Color based on score
-  const getScoreColor = () => {
-    if (score >= 65) return { ring: '#ef4444', text: 'text-red-400', bg: 'from-red-500/20 to-red-600/5' }
-    if (score >= 35) return { ring: '#eab308', text: 'text-yellow-400', bg: 'from-yellow-500/20 to-yellow-600/5' }
-    return { ring: '#22c55e', text: 'text-green-400', bg: 'from-green-500/20 to-green-600/5' }
-  }
+  const theme = score >= 65
+    ? { stroke: 'url(#gaugeRed)', text: 'text-red-400', bg: 'from-red-500/[0.06] to-red-600/[0.02]', ring: 'from-red-500/60 to-rose-600' }
+    : score >= 35
+      ? { stroke: 'url(#gaugeYellow)', text: 'text-amber-400', bg: 'from-amber-500/[0.06] to-yellow-600/[0.02]', ring: 'from-amber-500/60 to-yellow-600' }
+      : { stroke: 'url(#gaugeGreen)', text: 'text-emerald-400', bg: 'from-emerald-500/[0.06] to-green-600/[0.02]', ring: 'from-emerald-500/60 to-green-600' }
 
-  const colors = getScoreColor()
+  const likelihoodConfig = {
+    likely: { label: 'Likely AI', Icon: ShieldAlert, color: 'text-red-400', bg: 'bg-red-500/[0.08] border-red-500/20' },
+    possible: { label: 'Inconclusive', Icon: AlertTriangle, color: 'text-amber-400', bg: 'bg-amber-500/[0.08] border-amber-500/20' },
+    unlikely: { label: 'Likely Human', Icon: ShieldCheck, color: 'text-emerald-400', bg: 'bg-emerald-500/[0.08] border-emerald-500/20' },
+    unknown: { label: 'Unknown', Icon: HelpCircle, color: 'text-gray-400', bg: 'bg-gray-500/[0.08] border-gray-500/20' },
+  }[likelihood] || { label: 'Unknown', Icon: HelpCircle, color: 'text-gray-400', bg: 'bg-gray-500/[0.08] border-gray-500/20' }
 
-  const getLikelihoodInfo = () => {
-    switch (likelihood) {
-      case 'likely':
-        return {
-          label: 'Likely AI-Generated',
-          Icon: ShieldAlert,
-          color: 'text-red-400',
-          bg: 'bg-red-500/10 border-red-500/30',
-        }
-      case 'possible':
-        return {
-          label: 'Possibly AI-Generated',
-          Icon: Shield,
-          color: 'text-yellow-400',
-          bg: 'bg-yellow-500/10 border-yellow-500/30',
-        }
-      case 'unlikely':
-        return {
-          label: 'Unlikely AI-Generated',
-          Icon: ShieldCheck,
-          color: 'text-green-400',
-          bg: 'bg-green-500/10 border-green-500/30',
-        }
-      default:
-        return {
-          label: 'Unable to Determine',
-          Icon: ShieldQuestion,
-          color: 'text-gray-400',
-          bg: 'bg-gray-500/10 border-gray-500/30',
-        }
-    }
-  }
+  const confidenceBadge = {
+    high: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+    medium: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+    low: 'bg-gray-500/10 text-gray-500 border-gray-500/20',
+  }[confidence] || 'bg-gray-500/10 text-gray-500 border-gray-500/20'
 
-  const info = getLikelihoodInfo()
-  const Icon = info.Icon
-
-  const confidenceBadge = () => {
-    const styles: Record<string, string> = {
-      high: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-      medium: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-      low: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
-    }
-    return styles[confidence] || styles.low
-  }
+  const LikelyIcon = likelihoodConfig.Icon
 
   return (
-    <div className={`bg-gradient-to-br ${colors.bg} rounded-2xl border border-gray-700/50 p-8 flex flex-col items-center gap-6`}>
-      {/* SVG Gauge */}
+    <div className={`glass rounded-3xl p-8 flex flex-col items-center gap-6 bg-gradient-to-br ${theme.bg} border-2 border-white/[0.06]`}>
+      {/* SVG Gauge with centered text */}
       <div className="relative">
-        <svg height={radius * 2} width={radius * 2} className="-rotate-90">
-          {/* Background ring */}
+        <svg width={size} height={size} className="-rotate-90 drop-shadow-lg">
+          <defs>
+            <linearGradient id="gaugeRed" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#ef4444" />
+              <stop offset="100%" stopColor="#f43f5e" />
+            </linearGradient>
+            <linearGradient id="gaugeYellow" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#f59e0b" />
+              <stop offset="100%" stopColor="#d97706" />
+            </linearGradient>
+            <linearGradient id="gaugeGreen" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#10b981" />
+              <stop offset="100%" stopColor="#059669" />
+            </linearGradient>
+          </defs>
           <circle
-            stroke="rgba(75, 85, 99, 0.3)"
-            fill="transparent"
-            strokeWidth={stroke}
-            r={normalizedRadius}
-            cx={radius}
-            cy={radius}
+            stroke="rgba(255,255,255,0.04)"
+            fill="none"
+            strokeWidth={strokeWidth}
+            r={radius}
+            cx={size / 2}
+            cy={size / 2}
           />
-          {/* Score ring */}
           <circle
-            stroke={colors.ring}
-            fill="transparent"
-            strokeWidth={stroke}
-            strokeDasharray={`${circumference} ${circumference}`}
-            style={{ strokeDashoffset, transition: 'stroke-dashoffset 1s ease-in-out' }}
+            stroke={theme.stroke}
+            fill="none"
+            strokeWidth={strokeWidth}
             strokeLinecap="round"
-            r={normalizedRadius}
-            cx={radius}
-            cy={radius}
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            r={radius}
+            cx={size / 2}
+            cy={size / 2}
+            style={{ transition: 'stroke-dashoffset 1.2s cubic-bezier(0.4, 0, 0.2, 1)' }}
           />
         </svg>
-        {/* Score text centered in the ring */}
+        {/* Centered text */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className={`text-4xl font-bold ${colors.text}`}>
-            {score.toFixed(0)}%
+          <span className={`text-[42px] font-extrabold tracking-tight ${theme.text}`}>
+            {score.toFixed(0)}
           </span>
-          <span className="text-xs text-gray-500 uppercase tracking-wider mt-1">AI Score</span>
+          <span className="text-[10px] text-gray-500 font-medium tracking-[0.15em] uppercase">
+            AI Score %
+          </span>
         </div>
       </div>
 
-      {/* Likelihood badge */}
-      <div className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${info.bg}`}>
-        <Icon className={`w-5 h-5 ${info.color}`} />
-        <span className={`font-semibold ${info.color}`}>{info.label}</span>
+      {/* Likelihood */}
+      <div className={`flex items-center gap-2 px-4 py-2 rounded-xl border ${likelihoodConfig.bg}`}>
+        <LikelyIcon className={`w-4 h-4 ${likelihoodConfig.color}`} />
+        <span className={`text-sm font-semibold ${likelihoodConfig.color}`}>
+          {likelihoodConfig.label}
+        </span>
       </div>
 
-      {/* Confidence badge */}
-      <div className={`text-xs px-3 py-1 rounded-full border ${confidenceBadge()}`}>
-        {confidence.charAt(0).toUpperCase() + confidence.slice(1)} Confidence
+      {/* Confidence */}
+      <div className={`text-[11px] font-semibold uppercase tracking-[0.12em] px-3 py-1.5 rounded-lg border ${confidenceBadge}`}>
+        {confidence} Confidence
       </div>
     </div>
   )

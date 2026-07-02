@@ -29,8 +29,8 @@ class WeightedScoringEngine:
     """Computes overall AI probability from domain-level results.
 
     Domain base weights (sum to 1.0):
-        spectral=0.25, temporal=0.12, spatial=0.10, structural=0.15,
-        production=0.15, vocal=0.13, watermark=0.10
+        spectral=0.37, temporal=0.10, spatial=0.05, structural=0.20,
+        production=0.05, vocal=0.18, watermark=0.05
 
     When a domain is inactive (not applicable or skipped by depth),
     its weight is redistributed proportionally among active domains.
