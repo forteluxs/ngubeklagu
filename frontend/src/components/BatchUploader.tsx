@@ -2,7 +2,7 @@ import { useState, useRef } from 'react'
 import { Upload, FileAudio, CheckCircle2, AlertCircle, Loader2, Play } from 'lucide-react'
 import { analyzeAudioStream, type AnalysisDepth, type AnalysisResult } from '../services/api'
 
-interface BatchItem {
+export interface BatchItem {
   id: string
   file: File
   status: 'pending' | 'analyzing' | 'completed' | 'error'
@@ -14,13 +14,15 @@ interface BatchItem {
 
 interface Props {
   depth: AnalysisDepth
+  items: BatchItem[]
+  setItems: React.Dispatch<React.SetStateAction<BatchItem[]>>
   onSelectResult: (result: AnalysisResult, file: File) => void
 }
 
-export default function BatchUploader({ depth, onSelectResult }: Props) {
-  const [items, setItems] = useState<BatchItem[]>([])
+export default function BatchUploader({ depth, items, setItems, onSelectResult }: Props) {
   const [isProcessing, setIsProcessing] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+
 
   const handleFilesChosen = (files: FileList | null) => {
     if (!files) return

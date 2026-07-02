@@ -5,7 +5,7 @@ import FileUploader from './components/FileUploader'
 import DepthSelector from './components/DepthSelector'
 import AnalysisResults from './components/AnalysisResults'
 import ScanHistoryModal from './components/ScanHistoryModal'
-import BatchUploader from './components/BatchUploader'
+import BatchUploader, { type BatchItem } from './components/BatchUploader'
 import { saveToHistory } from './services/historyStore'
 import { analyzeAudioStream, type AnalysisDepth, type AnalysisResult } from './services/api'
 
@@ -37,6 +37,8 @@ export default function App() {
   const [progressPercent, setProgressPercent] = useState<number>(0)
   const [progressMessage, setProgressMessage] = useState<string>('')
   const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(false)
+  const [batchItems, setBatchItems] = useState<BatchItem[]>([])
+
 
   const handleFileSelected = (file: File) => {
     setSelectedFile(file)
@@ -238,8 +240,14 @@ export default function App() {
                   onClear={handleClearFile}
                 />
               ) : (
-                <BatchUploader depth={depth} onSelectResult={handleSelectBatchResult} />
+                <BatchUploader
+                  depth={depth}
+                  items={batchItems}
+                  setItems={setBatchItems}
+                  onSelectResult={handleSelectBatchResult}
+                />
               )}
+
             </div>
 
 
