@@ -162,6 +162,7 @@ async def analyze_audio(
             overall_ai_likelihood=result.get("overall_ai_likelihood", "unknown"),
             high_freq_cutoff_hz=result.get("high_freq_cutoff_hz"),
             stereo_correlation=result.get("stereo_correlation"),
+            model_fingerprint=result.get("model_fingerprint"),
         )
 
     except HTTPException:

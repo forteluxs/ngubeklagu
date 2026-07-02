@@ -71,3 +71,7 @@ class AnalysisResponse(BaseModel):
     # Legacy quick-access fields
     high_freq_cutoff_hz: Optional[float] = None
     stereo_correlation: Optional[float] = None
+
+    # AI Model Fingerprinting
+    model_fingerprint: Optional[dict] = None
+

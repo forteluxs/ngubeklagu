@@ -29,6 +29,15 @@ export interface DomainResult {
   artifacts: AIArtifact[]
 }
 
+export interface ModelFingerprint {
+  predicted_model: string
+  confidence: 'low' | 'medium' | 'high'
+  confidence_score: number
+  model_probabilities: Record<string, number>
+  signature_traits: string[]
+  description: string
+}
+
 export interface AnalysisResult {
   // Scan metadata
   scan_id: string
@@ -59,7 +68,11 @@ export interface AnalysisResult {
   // Legacy quick-access fields
   high_freq_cutoff_hz: number | null
   stereo_correlation: number | null
+
+  // AI Model Fingerprinting
+  model_fingerprint?: ModelFingerprint | null
 }
+
 
 // --- API Methods ---
 

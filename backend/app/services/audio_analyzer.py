@@ -25,6 +25,7 @@ from .analyzers import (
 )
 from .analyzers.base import BaseAnalyzer, DomainResult
 from .analyzers.scoring import ScoringResult
+from .fingerprint import model_fingerprinter
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +116,16 @@ class AudioAnalyzer:
                 result["high_freq_cutoff_hz"] = artifact.value
             elif artifact.name == "phase_correlation":
                 result["stereo_correlation"] = artifact.value
+
+        # Run AI Model Fingerprinting
+        fp_res = model_fingerprinter.predict(
+            overall_score=scoring_result.overall_score,
+            artifacts=scoring_result.artifacts_flat,
+            duration=duration,
+            high_freq_cutoff_hz=result.get("high_freq_cutoff_hz"),
+            stereo_correlation=result.get("stereo_correlation"),
+        )
+        result["model_fingerprint"] = dataclasses.asdict(fp_res)
 
         return result
 

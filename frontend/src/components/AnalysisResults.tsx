@@ -3,6 +3,7 @@ import type { AnalysisResult } from '../services/api'
 import ScoreGauge from './ScoreGauge'
 import DomainCard from './DomainCard'
 import AudioInfo from './AudioInfo'
+import ModelFingerprintCard from './ModelFingerprintCard'
 
 interface Props {
   result: AnalysisResult
@@ -60,13 +61,18 @@ export default function AnalysisResults({ result, onReset }: Props) {
 
       {/* Main results grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left column: score + summary */}
+        {/* Left column: score + summary + fingerprint */}
         <div className="lg:col-span-1 space-y-4">
           <ScoreGauge
             score={result.overall_score}
             confidence={result.confidence}
             likelihood={result.overall_ai_likelihood}
           />
+
+          {result.model_fingerprint && (
+            <ModelFingerprintCard fingerprint={result.model_fingerprint} />
+          )}
+
 
           {/* Summary card */}
           <div className="glass rounded-2xl p-5 space-y-3.5 border-white/[0.06]">
