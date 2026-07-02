@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { Upload, FileAudio, CheckCircle2, AlertCircle, Loader2, Play } from 'lucide-react'
+import { Upload, FileAudio, CheckCircle2, AlertCircle, Loader2, Play, Trash2 } from 'lucide-react'
 import { analyzeAudioStream, type AnalysisDepth, type AnalysisResult } from '../services/api'
 
 export interface BatchItem {
@@ -22,7 +22,6 @@ interface Props {
 export default function BatchUploader({ depth, items, setItems, onSelectResult }: Props) {
   const [isProcessing, setIsProcessing] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
-
 
   const handleFilesChosen = (files: FileList | null) => {
     if (!files) return
@@ -126,7 +125,7 @@ export default function BatchUploader({ depth, items, setItems, onSelectResult }
       {/* Queue items */}
       {items.length > 0 && (
         <div className="glass rounded-2xl p-5 space-y-4 border border-white/[0.06]">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
               Batch Queue ({items.filter((i) => i.status === 'completed').length}/{items.length})
             </h4>
@@ -134,9 +133,9 @@ export default function BatchUploader({ depth, items, setItems, onSelectResult }
               <button
                 onClick={clearBatch}
                 disabled={isProcessing}
-                className="text-xs text-gray-500 hover:text-gray-300 disabled:opacity-40 transition"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 text-xs font-medium disabled:opacity-40 transition"
               >
-                Clear Queue
+                <Trash2 className="w-3.5 h-3.5" /> Clear Batch Queue
               </button>
               <button
                 onClick={startBatch}
@@ -148,6 +147,7 @@ export default function BatchUploader({ depth, items, setItems, onSelectResult }
               </button>
             </div>
           </div>
+
 
           <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
             {items.map((item) => (
