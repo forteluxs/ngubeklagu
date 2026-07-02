@@ -26,6 +26,8 @@ from .analyzers import (
 from .analyzers.base import BaseAnalyzer, DomainResult
 from .analyzers.scoring import ScoringResult
 from .fingerprint import model_fingerprinter
+from .ml_classifier import ml_classifier
+
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +84,22 @@ class AudioAnalyzer:
         scoring_result = self._run_analyzers(y_mono, y_stereo, sr, depth_enum, progress_callback)
 
         if progress_callback:
-            progress_callback(90, "Running AI Model Fingerprinting & Scoring...")
+            progress_callback(90, "Running ML Random Forest & AI Model Fingerprinting...")
+
+        # Run SubmitHub-style ML Random Forest Classifier
+        ml_prob, ml_summary = ml_classifier.predict_ai_probability(y_mono, sr)
+        ml_score_pct = ml_prob * 100.0
+
+        # Blended overall score: 60% ML Random Forest Classifier + 40% Forensic Domain Scoring
+        final_blended_score = round(0.60 * ml_score_pct + 0.40 * scoring_result.overall_score, 1)
+
+        # Update likelihood category based on blended score
+        if final_blended_score >= 65.0:
+            blended_likelihood = "likely"
+        elif final_blended_score >= 35.0:
+            blended_likelihood = "possible"
+        else:
+            blended_likelihood = "unlikely"
 
         # Build result dict
         result = {
@@ -92,11 +109,13 @@ class AudioAnalyzer:
             "channels": channels,
             "peak_db": round(peak_db, 1),
             "rms_db": round(rms_db, 1),
-            # New scoring
-            "overall_score": scoring_result.overall_score,
+            # Blended ML + Forensic scoring
+            "overall_score": final_blended_score,
+            "ml_ai_probability": round(ml_prob * 100, 1),
             "confidence": scoring_result.confidence,
             "confidence_value": scoring_result.confidence_value,
             "depth_used": depth,
+
             # Domain results
             "domain_results": [
                 dataclasses.asdict(d) for d in scoring_result.domain_results
