@@ -230,41 +230,29 @@ class TemporalAnalyzer(BaseAnalyzer):
         else:
             beat_confidence = 0.5
 
-        # Map to probability — multiple sub-indicators
+        # Map to probability — only flag extreme uncorrelated timing anomalies
         probabilities = []
 
-        # Low beat tracking confidence
-        if beat_confidence < 0.3:
-            probabilities.append(0.7)
-        elif beat_confidence < 0.5:
-            probabilities.append(0.5)
+        # Very low beat tracking confidence (blurry/smeared beats)
+        if beat_confidence < 0.15:
+            probabilities.append(0.65)
 
-        # High jitter with uncorrelated timing (AI signature)
-        if ibi_cv > 0.15 and abs(autocorr_lag1) < 0.2:
-            probabilities.append(0.7)
-        elif ibi_cv > 0.1 and abs(autocorr_lag1) < 0.3:
-            probabilities.append(0.4)
-
-        # Perfectly rigid timing (suspicious but less so)
-        if ibi_cv < 0.005:
-            probabilities.append(0.3)
-
-        # Near-zero autocorrelation with moderate jitter (AI uncorrelated noise)
-        if 0.02 < ibi_cv < 0.15 and abs(autocorr_lag1) < 0.15:
-            probabilities.append(0.5)
+        # High chaotic jitter with uncorrelated timing (AI signature)
+        if ibi_cv > 0.35 and abs(autocorr_lag1) < 0.1:
+            probabilities.append(0.6)
+        elif ibi_cv > 0.25 and abs(autocorr_lag1) < 0.15:
+            probabilities.append(0.35)
 
         probability = max(probabilities) if probabilities else 0.0
 
         if probability >= 0.6:
             severity = "high"
-        elif probability >= 0.4:
+        elif probability >= 0.35:
             severity = "medium"
-        elif probability >= 0.2:
-            severity = "low"
         else:
             severity = "none"
 
-        detected = probability >= 0.4
+        detected = probability >= 0.35
 
         bpm = 60.0 / mean_ibi if mean_ibi > 0 else 0
 
