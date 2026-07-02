@@ -1,4 +1,4 @@
-import { FileAudio, RotateCcw, Download, FileText } from 'lucide-react'
+import { FileAudio, RotateCcw, Download, FileText, ArrowLeft } from 'lucide-react'
 import type { AnalysisResult } from '../services/api'
 import ScoreGauge from './ScoreGauge'
 import DomainCard from './DomainCard'
@@ -39,6 +39,14 @@ export default function AnalysisResults({ result, file, onReset }: Props) {
       {/* Top bar */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3 min-w-0">
+          <button
+            onClick={onReset}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-gray-200 hover:text-white transition text-xs font-semibold shadow-sm flex-shrink-0"
+          >
+            <ArrowLeft className="w-4 h-4 text-indigo-400" />
+            <span>Kembali</span>
+          </button>
+
           <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center flex-shrink-0">
             <FileAudio className="w-5 h-5 text-indigo-400" />
           </div>
@@ -72,6 +80,7 @@ export default function AnalysisResults({ result, file, onReset }: Props) {
           </button>
         </div>
       </div>
+
 
       {/* Interactive Waveform Player & Artifact Spectrogram Timeline */}
       <AudioWaveformPlayer file={file || null} result={result} />
