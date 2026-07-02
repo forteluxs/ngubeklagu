@@ -76,6 +76,74 @@ export interface AnalysisResult {
 
 // --- API Methods ---
 
+export async function analyzeAudioStream(
+  file: File,
+  depth: AnalysisDepth = 'standard',
+  onProgress?: (percent: number, message: string) => void
+): Promise<AnalysisResult> {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const response = await fetch(`/api/analyze-stream?depth=${depth}`, {
+    method: 'POST',
+    body: formData,
+  })
+
+  if (!response.ok) {
+    const errText = await response.text()
+    throw new Error(errText || `Server error ${response.status}`)
+  }
+
+  const reader = response.body?.getReader()
+  if (!reader) {
+    throw new Error('ReadableStream not supported')
+  }
+
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let finalResult: AnalysisResult | null = null
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() || ''
+
+    for (const line of lines) {
+      if (!line.trim()) continue
+      try {
+        const payload = JSON.parse(line)
+        if (payload.type === 'progress') {
+          onProgress?.(payload.percent, payload.message)
+        } else if (payload.type === 'result') {
+          finalResult = payload.data as AnalysisResult
+        } else if (payload.type === 'error') {
+          throw new Error(payload.message)
+        }
+      } catch (err) {
+        console.warn('NDJSON parse error', err)
+      }
+    }
+  }
+
+  if (buffer.trim()) {
+    try {
+      const payload = JSON.parse(buffer)
+      if (payload.type === 'result') {
+        finalResult = payload.data as AnalysisResult
+      }
+    } catch (_) {}
+  }
+
+  if (!finalResult) {
+    throw new Error('Analysis completed without returning result data')
+  }
+
+  return finalResult
+}
+
 export async function analyzeAudio(
   file: File,
   depth: AnalysisDepth = 'standard'
@@ -98,3 +166,4 @@ export async function healthCheck(): Promise<{ status: string }> {
   const { data } = await api.get('/health')
   return data
 }
+

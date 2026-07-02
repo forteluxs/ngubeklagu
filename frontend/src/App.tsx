@@ -3,7 +3,7 @@ import { AudioLines, Loader2, AlertCircle, Activity } from 'lucide-react'
 import FileUploader from './components/FileUploader'
 import DepthSelector from './components/DepthSelector'
 import AnalysisResults from './components/AnalysisResults'
-import { analyzeAudio, type AnalysisDepth, type AnalysisResult } from './services/api'
+import { analyzeAudioStream, type AnalysisDepth, type AnalysisResult } from './services/api'
 
 type AppState = 'idle' | 'analyzing' | 'results' | 'error'
 
@@ -22,18 +22,14 @@ const DEPTH_MESSAGES: Record<AnalysisDepth, { title: string; subtitle: string }>
   },
 }
 
-const DEPTH_TIMES: Record<AnalysisDepth, string> = {
-  quick: '~5s',
-  standard: '~15s',
-  deep: '~45s',
-}
-
 export default function App() {
   const [state, setState] = useState<AppState>('idle')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [depth, setDepth] = useState<AnalysisDepth>('standard')
   const [result, setResult] = useState<AnalysisResult | null>(null)
   const [error, setError] = useState<string>('')
+  const [progressPercent, setProgressPercent] = useState<number>(0)
+  const [progressMessage, setProgressMessage] = useState<string>('')
 
   const handleFileSelected = (file: File) => {
     setSelectedFile(file)
@@ -50,30 +46,30 @@ export default function App() {
     setState('analyzing')
     setError('')
     setResult(null)
+    setProgressPercent(5)
+    setProgressMessage('Initializing analysis stream...')
 
     try {
-      const res = await analyzeAudio(selectedFile, depth)
+      const res = await analyzeAudioStream(selectedFile, depth, (pct, msg) => {
+        setProgressPercent(pct)
+        setProgressMessage(msg)
+      })
       setResult(res)
       setState('results')
     } catch (err: unknown) {
       let message = 'An unexpected error occurred'
       if (err instanceof Error) {
-        if (err.message.includes('Network Error')) {
-          message = 'Cannot connect to backend. Ensure server is running on port 8000.'
-        } else if (err.message.includes('timeout')) {
-          message = 'Analysis timed out. Try a shorter file or quicker depth.'
+        if (err.message.includes('Network Error') || err.message.includes('Failed to fetch')) {
+          message = 'Cannot connect to backend. Ensure server is running.'
         } else {
           message = err.message
         }
-      }
-      if (typeof err === 'object' && err !== null && 'response' in err) {
-        const axiosErr = err as { response?: { data?: { detail?: string }; status?: number } }
-        if (axiosErr.response?.data?.detail) message = axiosErr.response.data.detail
       }
       setError(message)
       setState('error')
     }
   }
+
 
   const handleReset = () => {
     setState('idle')
@@ -121,35 +117,45 @@ export default function App() {
 
         {/* Analyzing state */}
         {state === 'analyzing' && (
-          <div className="flex flex-col items-center justify-center py-32 gap-8 animate-fade-in-up">
+          <div className="flex flex-col items-center justify-center py-28 gap-8 animate-fade-in-up">
             <div className="relative">
-              <div className="w-24 h-24 rounded-2xl glass flex items-center justify-center">
-                <Activity className="w-10 h-10 text-indigo-400 animate-pulse-ring" />
+              <div className="w-24 h-24 rounded-2xl glass flex items-center justify-center border border-indigo-500/30">
+                <Activity className="w-10 h-10 text-indigo-400 animate-pulse" />
               </div>
-              <div className="absolute -inset-3 rounded-2xl border border-indigo-500/10 animate-spin-slow" />
+              <div className="absolute -inset-3 rounded-2xl border border-indigo-500/20 animate-spin-slow" />
             </div>
-            <div className="text-center space-y-2">
-              <h2 className="text-xl font-semibold text-gray-200">
+
+            <div className="text-center space-y-3 max-w-md w-full px-4">
+              <h2 className="text-xl font-semibold text-gray-100">
                 {DEPTH_MESSAGES[depth].title}
               </h2>
-              <p className="text-sm text-gray-500 max-w-md">
-                {DEPTH_MESSAGES[depth].subtitle}
-              </p>
-              <div className="flex items-center justify-center gap-2 mt-4">
-                <Loader2 className="w-3.5 h-3.5 text-indigo-400 animate-spin" />
-                <span className="text-xs text-gray-600 font-mono">
-                  Estimated: {DEPTH_TIMES[depth]}
-                </span>
+              
+              {/* Live Progress Bar */}
+              <div className="space-y-2 pt-2">
+                <div className="flex justify-between text-xs font-medium">
+                  <span className="text-gray-400 truncate pr-2">
+                    {progressMessage || DEPTH_MESSAGES[depth].subtitle}
+                  </span>
+                  <span className="font-mono text-indigo-400 font-bold tabular-nums">
+                    {progressPercent}%
+                  </span>
+                </div>
+                <div className="w-full h-2.5 rounded-full bg-white/[0.05] border border-white/[0.08] overflow-hidden p-0.5">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 transition-all duration-300 ease-out shadow-lg shadow-indigo-500/20"
+                    style={{ width: `${Math.max(progressPercent, 4)}%` }}
+                  />
+                </div>
               </div>
-            </div>
-            {/* Skeleton preview */}
-            <div className="w-full max-w-md space-y-3 opacity-30">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-12 rounded-xl glass animate-pulse" />
-              ))}
+
+              <div className="flex items-center justify-center gap-2 text-xs text-gray-500 pt-2">
+                <Loader2 className="w-3.5 h-3.5 text-indigo-400 animate-spin" />
+                <span>Processing signal matrices across 7 forensic domains...</span>
+              </div>
             </div>
           </div>
         )}
+
 
         {/* Idle / Error state */}
         {(state === 'idle' || state === 'error') && (

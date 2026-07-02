@@ -49,17 +49,12 @@ class AudioAnalyzer:
         self,
         audio_path: Path,
         depth: str = "standard",
+        progress_callback=None,
     ) -> dict:
-        """Analyze an audio file for AI generation indicators.
+        """Analyze an audio file for AI generation indicators."""
+        if progress_callback:
+            progress_callback(10, "Loading audio & extracting waveforms...")
 
-        Args:
-            audio_path: Path to the audio file.
-            depth: Analysis depth ("quick", "standard", "deep").
-
-        Returns:
-            Dict with full analysis results including domain breakdowns,
-            overall score, confidence, and individual artifact details.
-        """
         depth_enum = AnalysisDepth[depth.upper()]
 
         # Load audio
@@ -84,7 +79,10 @@ class AudioAnalyzer:
         rms_db = 20.0 * np.log10(rms + 1e-10)
 
         # Run domain analyzers
-        scoring_result = self._run_analyzers(y_mono, y_stereo, sr, depth_enum)
+        scoring_result = self._run_analyzers(y_mono, y_stereo, sr, depth_enum, progress_callback)
+
+        if progress_callback:
+            progress_callback(90, "Running AI Model Fingerprinting & Scoring...")
 
         # Build result dict
         result = {
@@ -127,6 +125,9 @@ class AudioAnalyzer:
         )
         result["model_fingerprint"] = dataclasses.asdict(fp_res)
 
+        if progress_callback:
+            progress_callback(100, "Analysis complete!")
+
         return result
 
     def _run_analyzers(
@@ -135,18 +136,18 @@ class AudioAnalyzer:
         y_stereo: Optional[np.ndarray],
         sr: int,
         depth: AnalysisDepth,
+        progress_callback=None,
     ) -> ScoringResult:
-        """Run all applicable domain analyzers and score results.
-
-        Analyzers are skipped if the requested depth is below their
-        minimum depth requirement. Skipped analyzers return inactive
-        DomainResults so their weight is redistributed.
-        """
+        """Run all applicable domain analyzers and score results."""
         domain_results: list[DomainResult] = []
+        total_analyzers = len(self._analyzers)
 
-        for analyzer in self._analyzers:
+        for idx, analyzer in enumerate(self._analyzers):
+            current_pct = int(15 + (idx / total_analyzers) * 70)
+            if progress_callback:
+                progress_callback(current_pct, f"Analyzing {analyzer.display_name} Domain...")
+
             if depth < analyzer.min_depth:
-                # Depth too shallow for this analyzer
                 domain_results.append(DomainResult(
                     domain=analyzer.domain,
                     display_name=analyzer.display_name,
@@ -155,21 +156,12 @@ class AudioAnalyzer:
                     weight=analyzer.base_weight,
                     active=False,
                 ))
-                logger.debug(
-                    "Skipping %s (requires %s, got %s)",
-                    analyzer.domain, analyzer.min_depth.name, depth.name,
-                )
                 continue
 
             try:
                 logger.info("Running %s analyzer...", analyzer.domain)
                 result = analyzer.analyze(y_mono, sr, y_stereo, depth)
                 domain_results.append(result)
-                logger.info(
-                    "%s: score=%.2f, active=%s, artifacts=%d",
-                    analyzer.domain, result.score, result.active,
-                    len(result.artifacts),
-                )
             except Exception as e:
                 logger.error("Analyzer %s failed: %s", analyzer.domain, e)
                 domain_results.append(DomainResult(
@@ -182,6 +174,7 @@ class AudioAnalyzer:
                 ))
 
         return self._scoring_engine.calculate(domain_results)
+
 
 
 # Singleton instance
