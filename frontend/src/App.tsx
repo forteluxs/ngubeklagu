@@ -1,11 +1,16 @@
 import { useState } from 'react'
-import { AudioLines, Loader2, AlertCircle, Activity } from 'lucide-react'
+import { AudioLines, History, Layers, Activity, Loader2, AlertCircle } from 'lucide-react'
+
 import FileUploader from './components/FileUploader'
 import DepthSelector from './components/DepthSelector'
 import AnalysisResults from './components/AnalysisResults'
+import ScanHistoryModal from './components/ScanHistoryModal'
+import BatchUploader from './components/BatchUploader'
+import { saveToHistory } from './services/historyStore'
 import { analyzeAudioStream, type AnalysisDepth, type AnalysisResult } from './services/api'
 
 type AppState = 'idle' | 'analyzing' | 'results' | 'error'
+type UploadMode = 'single' | 'batch'
 
 const DEPTH_MESSAGES: Record<AnalysisDepth, { title: string; subtitle: string }> = {
   quick: {
@@ -24,12 +29,14 @@ const DEPTH_MESSAGES: Record<AnalysisDepth, { title: string; subtitle: string }>
 
 export default function App() {
   const [state, setState] = useState<AppState>('idle')
+  const [mode, setMode] = useState<UploadMode>('single')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [depth, setDepth] = useState<AnalysisDepth>('standard')
   const [result, setResult] = useState<AnalysisResult | null>(null)
   const [error, setError] = useState<string>('')
   const [progressPercent, setProgressPercent] = useState<number>(0)
   const [progressMessage, setProgressMessage] = useState<string>('')
+  const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(false)
 
   const handleFileSelected = (file: File) => {
     setSelectedFile(file)
@@ -54,6 +61,7 @@ export default function App() {
         setProgressPercent(pct)
         setProgressMessage(msg)
       })
+      saveToHistory(res)
       setResult(res)
       setState('results')
     } catch (err: unknown) {
@@ -70,6 +78,18 @@ export default function App() {
     }
   }
 
+  const handleSelectHistoryResult = (res: AnalysisResult) => {
+    saveToHistory(res)
+    setResult(res)
+    setState('results')
+  }
+
+  const handleSelectBatchResult = (res: AnalysisResult, file: File) => {
+    saveToHistory(res)
+    setSelectedFile(file)
+    setResult(res)
+    setState('results')
+  }
 
   const handleReset = () => {
     setState('idle')
@@ -80,8 +100,15 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-mesh bg-grid">
+      {/* Scan History Modal */}
+      <ScanHistoryModal
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        onSelectResult={handleSelectHistoryResult}
+      />
+
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-white/[0.04] glass">
+      <header className="sticky top-0 z-40 border-b border-white/[0.04] glass">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
@@ -96,11 +123,15 @@ export default function App() {
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-4 text-xs text-gray-600">
-            <span className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/60" />
-              {state === 'analyzing' ? 'Processing...' : 'Ready'}
-            </span>
+
+          <div className="flex items-center gap-3 text-xs">
+            <button
+              onClick={() => setIsHistoryOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass border-white/[0.06] text-gray-300 hover:text-white hover:bg-white/[0.04] transition font-medium"
+            >
+              <History className="w-3.5 h-3.5 text-indigo-400" />
+              <span>History Log</span>
+            </button>
             <span className="text-gray-800">v0.2</span>
           </div>
         </div>
@@ -111,9 +142,10 @@ export default function App() {
         {/* Results state */}
         {state === 'results' && result && (
           <div className="animate-fade-in-up">
-            <AnalysisResults result={result} onReset={handleReset} />
+            <AnalysisResults result={result} file={selectedFile} onReset={handleReset} />
           </div>
         )}
+
 
         {/* Analyzing state */}
         {state === 'analyzing' && (
@@ -171,14 +203,45 @@ export default function App() {
               </p>
             </div>
 
-            {/* Upload */}
-            <div className="max-w-xl mx-auto">
-              <FileUploader
-                onFileSelected={handleFileSelected}
-                selectedFile={selectedFile}
-                onClear={handleClearFile}
-              />
+            {/* Mode Switcher */}
+            <div className="flex items-center justify-center gap-2 max-w-xl mx-auto">
+              <div className="glass rounded-xl p-1 flex items-center border border-white/[0.06]">
+                <button
+                  onClick={() => setMode('single')}
+                  className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition ${
+                    mode === 'single'
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'text-gray-400 hover:text-gray-200'
+                  }`}
+                >
+                  Single Track
+                </button>
+                <button
+                  onClick={() => setMode('batch')}
+                  className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 ${
+                    mode === 'batch'
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'text-gray-400 hover:text-gray-200'
+                  }`}
+                >
+                  <Layers className="w-3.5 h-3.5" /> Batch Processing
+                </button>
+              </div>
             </div>
+
+            {/* Upload Box */}
+            <div className="max-w-xl mx-auto">
+              {mode === 'single' ? (
+                <FileUploader
+                  onFileSelected={handleFileSelected}
+                  selectedFile={selectedFile}
+                  onClear={handleClearFile}
+                />
+              ) : (
+                <BatchUploader depth={depth} onSelectResult={handleSelectBatchResult} />
+              )}
+            </div>
+
 
             {/* Depth + Analyze */}
             {selectedFile && (

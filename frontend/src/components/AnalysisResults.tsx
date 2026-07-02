@@ -1,21 +1,24 @@
-import { FileAudio, RotateCcw, Download } from 'lucide-react'
+import { FileAudio, RotateCcw, Download, FileText } from 'lucide-react'
 import type { AnalysisResult } from '../services/api'
 import ScoreGauge from './ScoreGauge'
 import DomainCard from './DomainCard'
 import AudioInfo from './AudioInfo'
 import ModelFingerprintCard from './ModelFingerprintCard'
+import AudioWaveformPlayer from './AudioWaveformPlayer'
+import { generateForensicPDFReport } from '../utils/pdfReport'
 
 interface Props {
   result: AnalysisResult
+  file?: File | null
   onReset: () => void
 }
 
-export default function AnalysisResults({ result, onReset }: Props) {
+export default function AnalysisResults({ result, file, onReset }: Props) {
   const activeDomains = result.domain_results.filter(d => d.active)
   const inactiveDomains = result.domain_results.filter(d => !d.active)
   const sortedActive = [...activeDomains].sort((a, b) => b.score - a.score)
 
-  const handleExport = () => {
+  const handleExportJSON = () => {
     const data = { ...result, export_metadata: { exported_at: new Date().toISOString(), version: '1.0' } }
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
@@ -25,6 +28,10 @@ export default function AnalysisResults({ result, onReset }: Props) {
     a.href = url; a.download = `${base}_analysis_${ts}.json`
     document.body.appendChild(a); a.click(); document.body.removeChild(a)
     URL.revokeObjectURL(url)
+  }
+
+  const handleExportPDF = () => {
+    generateForensicPDFReport(result)
   }
 
   return (
@@ -44,20 +51,34 @@ export default function AnalysisResults({ result, onReset }: Props) {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={handleExport}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl glass border-white/[0.06] text-gray-400 hover:text-gray-200 hover:bg-white/[0.04] transition text-sm font-medium">
-            <Download className="w-4 h-4" /> Export
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={handleExportPDF}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 transition text-sm font-medium"
+          >
+            <FileText className="w-4 h-4 text-indigo-400" /> PDF Report
           </button>
-          <button onClick={onReset}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl glass border-white/[0.06] text-gray-400 hover:text-gray-200 hover:bg-white/[0.04] transition text-sm font-medium">
+          <button
+            onClick={handleExportJSON}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl glass border-white/[0.06] text-gray-400 hover:text-gray-200 hover:bg-white/[0.04] transition text-sm font-medium"
+          >
+            <Download className="w-4 h-4" /> JSON
+          </button>
+          <button
+            onClick={onReset}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl glass border-white/[0.06] text-gray-400 hover:text-gray-200 hover:bg-white/[0.04] transition text-sm font-medium"
+          >
             <RotateCcw className="w-4 h-4" /> New Scan
           </button>
         </div>
       </div>
 
+      {/* Interactive Waveform Player & Artifact Spectrogram Timeline */}
+      <AudioWaveformPlayer file={file || null} result={result} />
+
       {/* Audio info */}
       <AudioInfo result={result} />
+
 
       {/* Main results grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
